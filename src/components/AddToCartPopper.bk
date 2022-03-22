@@ -1,0 +1,214 @@
+import {
+  forwardRef,
+  cloneElement,
+  useState,
+  useImperativeHandle,
+  useRef,
+  useEffect,
+} from "react";
+import { usePopper } from "react-popper";
+import { sortModifierGroupItems, sortModifiers } from "./../utils/utils";
+
+const AddToCartPopper = forwardRef(
+  (
+    {
+      id,
+      priceFromModId,
+      priceFromModifier,
+      priceFromModifierGroupItem,
+      itemPrice,
+      children,
+    },
+    ref
+  ) => {
+    const [childNode, setChildNode] = useState(null);
+    const [food, setFood] = useState(null);
+    const [
+      validate_modifierWithMinQty_isRequired,
+      setValidate_modifierWithMinQty_isRequired,
+    ] = useState(false);
+    const [
+      modifierGroupObjectWithMinQty_isRequired,
+      setModifierGroupObjectWithMinQty_isRequired,
+    ] = useState([]);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        onAddToCartDialogClickOpen,
+      }),
+      []
+    );
+
+    const onAddToCartDialogClickOpen = (food, category, idx, e) => {
+      console.log("clicked");
+      console.log(food);
+      setFood(food);
+    };
+
+    const [visible, setVisible] = useState(false);
+    const referenceRef = useRef(null);
+    const popperRef = useRef(null);
+
+    const { styles, attributes } = usePopper(
+      referenceRef.current,
+      popperRef.current
+    );
+
+    useEffect(() => {
+      // listen for clicks and close dropdown on body
+      document.addEventListener("mousedown", handleDocumentClick);
+      return () => {
+        document.removeEventListener("mousedown", handleDocumentClick);
+      };
+    }, []);
+
+    useEffect(() => {
+      if (visible) {
+        childNode?.style.zIndex = 30;
+      } else {
+        childNode?.style.zIndex = 0;
+      }
+    }, [visible]);
+
+    function handleDocumentClick(event) {
+      if (referenceRef.current.contains(event.target)) {
+        return;
+      }
+      if (popperRef.current.contains(event.target)) {
+        return;
+      }
+      setVisible(false);
+    }
+
+    function handleButtonClick(event) {
+      setVisible(!visible);
+    }
+
+    return (
+      <>
+        <div ref={referenceRef} onClick={handleButtonClick}>
+          {cloneElement(children, {
+            ...children.props,
+            ref: setChildNode,
+            style: {
+              border: visible ? "1px solid red" : "",
+              zIndex: visible ? 2 : "0",
+            },
+          })}
+        </div>
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            background: "rgba(0, 0, 0, 0.8)",
+            position: "fixed",
+            top: 0,
+            left: 0,
+            visibility: visible ? "visible" : "hidden",
+            zIndex: 1
+          }}
+        ></div>
+        <div ref={popperRef} style={{...styles.popper, zIndex: 3}} {...attributes.popper}>
+          <div
+            style={{
+              display: visible ? "block" : "none",
+              zIndex: 3,
+              backgroundColor: "#c8c8c8",
+              width: 610,
+              overflow: "auto",
+            }}
+          >
+            <div>
+              <button
+                onClick={() => {
+                  handleButtonClick();
+                }}
+              >
+                X
+              </button>
+            </div>
+            {sortModifierGroupItems(
+              food?.modifierGroupItems,
+              "asc",
+              "sequence"
+            )?.map((modifierGroupItem) => {
+              const {
+                minQty,
+                maxQty = 0,
+                modifierGroup: modGroup,
+              } = modifierGroupItem;
+              let modifierConditionText = "";
+              let isModGroupEnable = false;
+
+              for (let i = 0; i < modGroup.modifiers.length; i++) {
+                const disableItemList =
+                  modGroup.modifiers[i]?.disableItemList || "";
+                if (!disableItemList.includes(food.id + ",")) {
+                  isModGroupEnable = true;
+                  break;
+                }
+              }
+
+              if (minQty > 0) {
+                if (maxQty > 0) {
+                  modifierConditionText = `(At least ${minQty} and allow max ${maxQty})`;
+                } else {
+                  modifierConditionText = `(At least ${minQty})`;
+                }
+              }
+
+              if (isModGroupEnable) {
+                return (
+                  <div>
+                    <div key={modGroup.id}>{modGroup.name}</div>
+                    <hr />
+                    <ul>
+                      {sortModifiers(modGroup.modifiers, "asc", "price").map(
+                        (modifier) => {
+                          const disableItemList =
+                            modifier?.disableItemList || "";
+                          if (disableItemList.includes(food.id + ",")) return;
+                          return (
+                            <li key={modifier.id}>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "row",
+                                }}
+                              >
+                                <div>{modifier.name}</div>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "row",
+                                  }}
+                                >
+                                  <button
+                                    onClick={() => {
+                                      console.log("- clicked");
+                                    }}
+                                  >
+                                    -
+                                  </button>
+                                  <p>1</p>
+                                  <button>+</button>
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        }
+                      )}
+                    </ul>
+                  </div>
+                );
+              }
+            })}
+          </div>
+        </div>
+      </>
+    );
+  }
+);
+
+export default AddToCartPopper;
